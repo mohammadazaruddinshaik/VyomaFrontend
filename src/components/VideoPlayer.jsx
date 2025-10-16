@@ -10,9 +10,11 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
   const [availableQualities, setAvailableQualities] = useState([]);
   const [currentQuality, setCurrentQuality] = useState('auto');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(true);
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const intervalRef = useRef(null);
+  const qualitySetRef = useRef(false);
 
   useEffect(() => {
     // Load YouTube IFrame API if not already loaded
@@ -42,7 +44,7 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
     playerRef.current = new window.YT.Player(`player-${videoId}`, {
       videoId: videoId,
       playerVars: {
-        autoplay: 1,
+        autoplay: 0, // Changed to 0 - we'll manually play after quality is set
         controls: 0,
         disablekb: 1,
         fs: 1,
@@ -50,13 +52,11 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
         rel: 0,
         showinfo: 0,
         iv_load_policy: 3,
-        playsinline: 0, // Changed to 0 to allow fullscreen VR
+        playsinline: 0,
         cc_load_policy: 0,
         loop: 0,
-        // Force highest quality
         vq: 'hd2160', // Request 4K quality
         hd: 1,
-        // Enable 360/VR features
         enablejsapi: 1,
       },
       events: {
@@ -96,38 +96,53 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
     console.log('Available quality levels:', availableQualityLevels);
     setAvailableQualities(availableQualityLevels);
     
-    // Force 4K quality - try multiple times to ensure it sticks
-    const force4K = () => {
-      if (availableQualityLevels.includes('hd2160')) {
-        event.target.setPlaybackQuality('hd2160');
-        setCurrentQuality('hd2160');
-        console.log('✅ Forcing 4K (2160p) quality');
-      } else if (availableQualityLevels.includes('hd1440')) {
-        event.target.setPlaybackQuality('hd1440');
-        setCurrentQuality('hd1440');
-        console.log('✅ Forcing 1440p quality (4K not available)');
-      } else if (availableQualityLevels.includes('hd1080')) {
-        event.target.setPlaybackQuality('hd1080');
-        setCurrentQuality('hd1080');
-        console.log('✅ Forcing 1080p quality (higher not available)');
-      } else if (availableQualityLevels.length > 0) {
-        const highestQuality = availableQualityLevels[0];
-        event.target.setPlaybackQuality(highestQuality);
-        setCurrentQuality(highestQuality);
-        console.log('✅ Setting highest available quality:', highestQuality);
+    // CRITICAL: Force highest quality BEFORE playing
+    let targetQuality = 'hd720'; // fallback
+    
+    if (availableQualityLevels.includes('hd2160')) {
+      targetQuality = 'hd2160';
+      console.log('🎬 Setting 4K (2160p) quality');
+    } else if (availableQualityLevels.includes('hd1440')) {
+      targetQuality = 'hd1440';
+      console.log('🎬 Setting 1440p quality');
+    } else if (availableQualityLevels.includes('hd1080')) {
+      targetQuality = 'hd1080';
+      console.log('🎬 Setting 1080p quality');
+    } else if (availableQualityLevels.length > 0) {
+      targetQuality = availableQualityLevels[0];
+      console.log('🎬 Setting highest available:', targetQuality);
+    }
+    
+    // Set quality FIRST
+    event.target.setPlaybackQuality(targetQuality);
+    setCurrentQuality(targetQuality);
+    qualitySetRef.current = true;
+    
+    // Wait for quality to be applied, then cue the video (don't play yet)
+    setTimeout(() => {
+      event.target.cueVideoById(videoId);
+      setIsBuffering(false);
+      
+      // Now play after quality is locked in
+      setTimeout(() => {
+        event.target.playVideo();
+        console.log('✅ Playing at quality:', event.target.getPlaybackQuality());
+      }, 500);
+    }, 300);
+    
+    // Monitor and maintain quality
+    const maintainQuality = setInterval(() => {
+      if (playerRef.current && playerRef.current.getPlaybackQuality) {
+        const currentQ = playerRef.current.getPlaybackQuality();
+        if (currentQ !== targetQuality && qualitySetRef.current) {
+          console.log('⚠️ Quality changed to', currentQ, '- restoring to', targetQuality);
+          playerRef.current.setPlaybackQuality(targetQuality);
+        }
       }
-    };
+    }, 2000);
     
-    // Set immediately
-    force4K();
-    
-    // Verify and re-apply after delays (YouTube sometimes resets quality)
-    setTimeout(force4K, 500);
-    setTimeout(force4K, 1500);
-    setTimeout(force4K, 3000);
-    
-    // Try to play the video
-    event.target.playVideo();
+    // Clean up quality monitor after 30 seconds
+    setTimeout(() => clearInterval(maintainQuality), 30000);
   };
 
   // Function to change video quality
@@ -355,6 +370,17 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
           display: none !important;
           visibility: hidden !important;
         }
+        
+        /* Ensure overlay bars appear in fullscreen */
+        :-webkit-full-screen-ancestor .fixed {
+          position: fixed !important;
+          z-index: 2147483647 !important;
+        }
+        
+        /* Safari fullscreen support */
+        :-webkit-full-screen .fixed {
+          position: fixed !important;
+        }
       `}</style>
 
       {/* Custom Controls Overlay */}
@@ -482,6 +508,17 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
           </div>
         </div>
       </div>
+
+      {/* Buffering Overlay */}
+      {isBuffering && (
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-40">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-vyoma-green border-t-transparent rounded-full animate-spin mb-4 mx-auto"></div>
+            <p className="text-white text-lg font-semibold">Loading 4K Quality...</p>
+            <p className="text-gray-400 text-sm mt-2">Preparing your immersive experience</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
