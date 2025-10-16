@@ -50,29 +50,68 @@ const TherapySession = () => {
   };
 
   const handleEnterVR = async () => {
-    if (!isVRSupported) {
-      alert('VR headset not detected. Enjoying in standard 360° mode!');
-      return;
-    }
-
     try {
       setIsVRMode(true);
-      const session = await navigator.xr.requestSession('immersive-vr', {
-        requiredFeatures: ['local-floor']
-      });
       
-      // Set up VR scene with A-Frame
-      const scene = document.querySelector('a-scene');
-      if (scene) {
-        await scene.enterVR();
+      // Get the iframe element
+      const iframe = document.querySelector('iframe');
+      if (!iframe) {
+        console.error('YouTube iframe not found');
+        alert('Video player not ready. Please try again.');
+        setIsVRMode(false);
+        return;
+      }
+
+      // For Quest browsers, request fullscreen which enables VR mode for 360 videos
+      const requestFullscreen = iframe.requestFullscreen || 
+                                iframe.webkitRequestFullscreen || 
+                                iframe.mozRequestFullScreen || 
+                                iframe.msRequestFullscreen;
+
+      if (requestFullscreen) {
+        try {
+          await requestFullscreen.call(iframe);
+          
+          // YouTube automatically detects VR headset in fullscreen mode for 360 videos
+          // The Quest browser will show the VR toggle button
+          console.log('Entered fullscreen VR mode');
+        } catch (fsError) {
+          console.error('Fullscreen error:', fsError);
+          
+          // Fallback: Try to trigger VR mode through YouTube API
+          if (videoPlayerRef.current?.getPlayer) {
+            const player = videoPlayerRef.current.getPlayer();
+            if (player && player.playVideo) {
+              player.playVideo();
+            }
+          }
+        }
+      } else {
+        // Fallback for browsers without fullscreen API
+        console.log('Fullscreen not supported, playing in 360 mode');
       }
       
-      session.addEventListener('end', () => {
-        setIsVRMode(false);
-      });
+      // Listen for fullscreen exit
+      const onFullscreenChange = () => {
+        if (!document.fullscreenElement && 
+            !document.webkitFullscreenElement && 
+            !document.mozFullScreenElement && 
+            !document.msFullscreenElement) {
+          setIsVRMode(false);
+          document.removeEventListener('fullscreenchange', onFullscreenChange);
+          document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+          document.removeEventListener('mozfullscreenchange', onFullscreenChange);
+          document.removeEventListener('MSFullscreenChange', onFullscreenChange);
+        }
+      };
+      
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+      document.addEventListener('mozfullscreenchange', onFullscreenChange);
+      document.addEventListener('MSFullscreenChange', onFullscreenChange);
+      
     } catch (error) {
       console.error('Error entering VR:', error);
-      alert('Could not enter VR mode. Enjoying in 360° mode instead!');
       setIsVRMode(false);
     }
   };

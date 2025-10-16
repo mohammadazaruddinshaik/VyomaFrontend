@@ -50,18 +50,31 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
         rel: 0,
         showinfo: 0,
         iv_load_policy: 3,
-        playsinline: 1,
+        playsinline: 0, // Changed to 0 to allow fullscreen VR
         cc_load_policy: 0,
         loop: 0,
         // Force highest quality
         vq: 'hd2160', // Request 4K quality
         hd: 1,
+        // Enable 360/VR features
+        enablejsapi: 1,
       },
       events: {
         onReady: onPlayerReady,
         onStateChange: onPlayerStateChange,
       },
     });
+
+    // Wait for iframe to be created, then add VR attributes
+    setTimeout(() => {
+      const iframe = document.querySelector(`#player-${videoId} iframe`);
+      if (iframe) {
+        iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('webkitallowfullscreen', 'true');
+        iframe.setAttribute('mozallowfullscreen', 'true');
+        iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; xr-spatial-tracking; fullscreen');
+      }
+    }, 100);
 
     return () => {
       // Cleanup on unmount or videoId change
@@ -233,13 +246,26 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
       ></div>
 
       <style>{`
-        /* Hide YouTube logo and info */
+        /* YouTube container styling */
         .youtube-container iframe {
           position: absolute;
           top: -60px !important;
           left: 0;
           width: 100%;
           height: calc(100% + 120px) !important;
+        }
+        
+        /* Fullscreen VR mode styling */
+        .youtube-container iframe:-webkit-full-screen,
+        .youtube-container iframe:-moz-full-screen,
+        .youtube-container iframe:-ms-fullscreen,
+        .youtube-container iframe:fullscreen {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          z-index: 999999 !important;
         }
         
         /* Additional branding removal */
