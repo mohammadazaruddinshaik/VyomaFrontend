@@ -96,20 +96,35 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
     console.log('Available quality levels:', availableQualityLevels);
     setAvailableQualities(availableQualityLevels);
     
-    if (availableQualityLevels.length > 0) {
-      // Set to highest quality by default
-      const highestQuality = availableQualityLevels[0];
-      event.target.setPlaybackQuality(highestQuality);
-      setCurrentQuality(highestQuality);
-      console.log('Setting initial quality to:', highestQuality);
-      
-      // Double check after a delay
-      setTimeout(() => {
-        const actualQuality = event.target.getPlaybackQuality();
-        setCurrentQuality(actualQuality);
-        console.log('Actual quality after setting:', actualQuality);
-      }, 1500);
-    }
+    // Force 4K quality - try multiple times to ensure it sticks
+    const force4K = () => {
+      if (availableQualityLevels.includes('hd2160')) {
+        event.target.setPlaybackQuality('hd2160');
+        setCurrentQuality('hd2160');
+        console.log('✅ Forcing 4K (2160p) quality');
+      } else if (availableQualityLevels.includes('hd1440')) {
+        event.target.setPlaybackQuality('hd1440');
+        setCurrentQuality('hd1440');
+        console.log('✅ Forcing 1440p quality (4K not available)');
+      } else if (availableQualityLevels.includes('hd1080')) {
+        event.target.setPlaybackQuality('hd1080');
+        setCurrentQuality('hd1080');
+        console.log('✅ Forcing 1080p quality (higher not available)');
+      } else if (availableQualityLevels.length > 0) {
+        const highestQuality = availableQualityLevels[0];
+        event.target.setPlaybackQuality(highestQuality);
+        setCurrentQuality(highestQuality);
+        console.log('✅ Setting highest available quality:', highestQuality);
+      }
+    };
+    
+    // Set immediately
+    force4K();
+    
+    // Verify and re-apply after delays (YouTube sometimes resets quality)
+    setTimeout(force4K, 500);
+    setTimeout(force4K, 1500);
+    setTimeout(force4K, 3000);
     
     // Try to play the video
     event.target.playVideo();
@@ -153,8 +168,21 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
       setIsPlaying(true);
       startProgressTracking();
       
-      // Update current quality when playing
-      if (playerRef.current && playerRef.current.getPlaybackQuality) {
+      // Force highest quality when playing starts
+      const availableQualityLevels = playerRef.current.getAvailableQualityLevels();
+      if (availableQualityLevels.includes('hd2160')) {
+        playerRef.current.setPlaybackQuality('hd2160');
+        setCurrentQuality('hd2160');
+        console.log('✅ Playing at 4K (2160p) quality');
+      } else if (availableQualityLevels.includes('hd1440')) {
+        playerRef.current.setPlaybackQuality('hd1440');
+        setCurrentQuality('hd1440');
+        console.log('✅ Playing at 1440p quality');
+      } else if (availableQualityLevels.includes('hd1080')) {
+        playerRef.current.setPlaybackQuality('hd1080');
+        setCurrentQuality('hd1080');
+        console.log('✅ Playing at 1080p quality');
+      } else {
         const quality = playerRef.current.getPlaybackQuality();
         setCurrentQuality(quality);
         console.log('Playing at quality:', quality);
@@ -249,10 +277,11 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
         /* YouTube container styling */
         .youtube-container iframe {
           position: absolute;
-          top: -60px !important;
+          top: -80px !important;
           left: 0;
           width: 100%;
-          height: calc(100% + 120px) !important;
+          height: calc(100% + 160px) !important;
+          pointer-events: auto;
         }
         
         /* Fullscreen VR mode styling */
@@ -268,13 +297,63 @@ const VideoPlayer = forwardRef(({ videoId, onEnterVR, onVideoEnd }, ref) => {
           z-index: 999999 !important;
         }
         
-        /* Additional branding removal */
+        /* COMPLETE YouTube branding removal - ALL elements */
         .ytp-large-play-button,
         .ytp-watermark,
         .ytp-chrome-top,
         .ytp-show-cards-title,
-        .ytp-pause-overlay {
+        .ytp-pause-overlay,
+        .ytp-chrome-bottom,
+        .ytp-gradient-bottom,
+        .ytp-gradient-top,
+        .ytp-title,
+        .ytp-title-text,
+        .ytp-title-link,
+        .ytp-share-button,
+        .ytp-share-panel,
+        .ytp-channel-button,
+        .ytp-watch-later-button,
+        .ytp-cards-button,
+        .ytp-cards-teaser,
+        .ytp-endscreen-content,
+        .ytp-ce-element,
+        .ytp-player-content,
+        .ytp-show-cards-title,
+        .ytp-info-panel-button,
+        .ytp-youtube-button,
+        .ytp-context-menu-button,
+        .ytp-settings-button,
+        .ytp-miniplayer-button,
+        .ytp-size-button,
+        .ytp-subtitles-button,
+        .ytp-overflow-button,
+        .iv-branding,
+        .ytp-impression-link,
+        .ytp-cued-thumbnail-overlay,
+        .ytp-ce-covering-overlay,
+        .ytp-ce-element-shadow,
+        .ytp-ce-top-left-quad,
+        .ytp-ce-top-right-quad,
+        .ytp-ce-bottom-left-quad,
+        .ytp-ce-bottom-right-quad,
+        .ytp-spinner,
+        .ytp-paid-content-overlay,
+        .ytp-muted-autoplay-endscreen-overlay {
           display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+        
+        /* Hide YouTube logo and branding in VR mode */
+        .youtube-container iframe:-webkit-full-screen .ytp-watermark,
+        .youtube-container iframe:-moz-full-screen .ytp-watermark,
+        .youtube-container iframe:fullscreen .ytp-watermark,
+        .youtube-container iframe:-webkit-full-screen .ytp-chrome-top,
+        .youtube-container iframe:-moz-full-screen .ytp-chrome-top,
+        .youtube-container iframe:fullscreen .ytp-chrome-top {
+          display: none !important;
+          visibility: hidden !important;
         }
       `}</style>
 

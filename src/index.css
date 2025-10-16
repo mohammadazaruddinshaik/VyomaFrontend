@@ -99,7 +99,7 @@
     @apply absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70;
   }
 
-  /* Hide YouTube branding */
+  /* Hide YouTube branding - Global */
   .youtube-container {
     position: relative;
     width: 100%;
@@ -124,6 +124,29 @@
     right: 0;
     z-index: 10;
     pointer-events: all;
+  }
+
+  /* Aggressively hide ALL YouTube UI elements globally */
+  iframe .ytp-large-play-button,
+  iframe .ytp-watermark,
+  iframe .ytp-chrome-top,
+  iframe .ytp-chrome-bottom,
+  iframe .ytp-gradient-bottom,
+  iframe .ytp-gradient-top,
+  iframe .ytp-title,
+  iframe .ytp-share-button,
+  iframe .ytp-channel-button,
+  iframe .ytp-youtube-button,
+  iframe .ytp-cards-button,
+  iframe .ytp-endscreen-content,
+  iframe .ytp-pause-overlay,
+  iframe .ytp-show-cards-title,
+  iframe .iv-branding,
+  iframe .ytp-impression-link {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   /* Loading spinner */

@@ -116,15 +116,28 @@ const TherapySession = () => {
     }
   };
 
-  const handleBeginSession = () => {
+  const handleBeginSession = async () => {
     setShowOverlay(false);
+    
+    // Wait for overlay to fade out
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     // Auto-play video after overlay is removed
-    setTimeout(() => {
-      const iframe = document.querySelector('iframe');
-      if (iframe) {
-        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-      }
-    }, 500);
+    const iframe = document.querySelector('iframe');
+    if (iframe) {
+      iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+    }
+    
+    // Auto-enter VR mode if VR headset is detected
+    if (isVRSupported) {
+      console.log('VR headset detected - auto-entering VR mode');
+      // Wait a bit for video to start playing
+      setTimeout(() => {
+        handleEnterVR();
+      }, 1000);
+    } else {
+      console.log('No VR headset detected - playing in normal 360° mode');
+    }
   };
 
   const handleSessionComplete = () => {
